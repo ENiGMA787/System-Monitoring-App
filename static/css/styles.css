@@ -171,3 +171,16 @@ p {
 .button-container button:hover {
     background-color: #0056b3;
 }
+.alert {
+    font-weight: bold;
+    padding: 8px 15px;
+    border-radius: 5px;
+    text-transform: uppercase;
+    font-size: 12px;
+    font-family: 'Rubik', sans-serif;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
