@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>System Monitoring Dashboard</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Rubik:400,700">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+
+<body>
+    <div class="container">
+        <h1>System Monitoring Dashboard</h1>
+        <div class="button-container">
+            <button onclick="showHistoricalData()">Historical</button>
+            <button onclick="showLatestData()">Latest</button>
+        </div>
+        <div class="stats-container">
+            <div class="data">
+                <h2>CPU Usage</h2>
+                <p><span id="cpu-usage">{{ cpu_usage }}%</span></p>
+                <canvas id="cpu-chart"></canvas>
+            </div>
+            <div class="data">
+                <h2>Memory Usage</h2>
+                <p><span id="mem-usage">{{ mem_usage }}%</span></p>
+                <canvas id="mem-chart"></canvas>
+            </div>
+            <div class="data">
+                <h2>Disk Usage</h2>
+                <p><span id="disk-usage">{{ disk_usage }}%</span></p>
+                <canvas id="disk-chart"></canvas>
+            </div>
+        </div>
+        <div class="data">
+            <h2>Alerts</h2>
+            <div id="msg" class="alert alert-ok"></div>
+        </div>
+    </div>
+    <button class="dark-mode-toggle">
+        <i class="fas fa-sun sun-icon"></i>
+        <i class="fas fa-moon moon-icon"></i>
+    </button>
+    <div class="logout-button-container">
+        <a href="/logout" class="logout-button">Logout</a>
+    </div>
+    <div class="update-time">Next Update: <span id="next-update-time"></span></div>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        let cpuChart, memChart, diskChart; // Define chart variables
+        let countdownInterval;
+        let data; // Variable to store fetched data
+
+        $(document).ready(function () {
+            function toggleDarkMode() {
+                $("body").toggleClass("dark-mode");
+                const isDarkMode = $("body").hasClass("dark-mode");
+                localStorage.setItem("darkMode", isDarkMode);
+                $(".fa-sun").toggle(!isDarkMode);
+                $(".fa-moon").toggle(isDarkMode);
+            }
+
+            $(".dark-mode-toggle").on("click", function () {
+                toggleDarkMode();
+            });
+
+            const isDarkMode = localStorage.getItem("darkMode") === "true";
+            if (isDarkMode) {
+                $("body").addClass("dark-mode");
+                $(".fa-sun").hide();
+            } else {
+                $(".fa-moon").hide();
+            }
+        });
+
+        function createChart(chartElement, data, label, backgroundColor) {
+            const ctx = chartElement.getContext('2d');
+            const chart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    datasets: [{
+                        data: [data, 100 - data],
+                        backgroundColor: [backgroundColor, '#eaeaea'],
+                        borderWidth: 0,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    cutoutPercentage: 80,
+                    legend: {
+                        display: false
+                    },
+                    tooltips: {
+                        enabled: false
+                    }
+                }
+            });
+            return chart;
+        }
+
+        function updateCharts() {
+            if (data) {
+                if (cpuChart) {
+                    cpuChart.destroy();
+                }
+                if (memChart) {
+                    memChart.destroy();
+                }
+                if (diskChart) {
+                    diskChart.destroy();
+                }
+
+                cpuChart = createChart(document.getElementById('cpu-chart'), data.cpu_usage, 'CPU', '#5cb85c');
+                memChart = createChart(document.getElementById('mem-chart'), data.mem_usage, 'Memory', '#f0ad4e');
+                diskChart = createChart(document.getElementById('disk-chart'), data.disk_usage, 'Disk', '#337ab7');
+
+                const now = new Date();
+                const nextUpdate = new Date(now.getTime() + 5000);
+                updateNextUpdateTime(nextUpdate);
+            }
+        }
+
+        function updateNextUpdateTime(nextUpdate) {
+            clearInterval(countdownInterval);
+
+            countdownInterval = setInterval(function () {
+                const now = new Date();
+                const remainingTime = Math.max(Math.floor((nextUpdate - now) / 1000), 0);
+
+                $("#next-update-time").text(remainingTime > 0 ? "" + remainingTime + "s" : " 0s");
+
+                if (remainingTime <= 0) {
+                    clearInterval(countdownInterval);
+                }
+            }, 1000);
+        }
+
+        function updateData() {
+            $.ajax({
+                url: "/indexdata",
+                type: "GET",
+                dataType: "json",
+                success: function (responseData) {
+                    data = responseData;
+                    $("#cpu-usage").text(data.cpu_usage + "%");
+                    $("#mem-usage").text(data.mem_usage + "%");
+                    $("#disk-usage").text(data.disk_usage + "%");
+                    $("#msg").text(data.msg);
+
+                    if (data.msg === "Warning") {
+                        $("#msg").removeClass("alert-ok").addClass("alert-warning");
+                        $("#msg").text("System Status: Warning - CPU, Memory, Disk usage is above 80%");
+                    } else {
+                        $("#msg").removeClass("alert-warning").addClass("alert-ok");
+                        $("#msg").text("System Status: Everything is running smoothly.");
+                    }
+
+                    updateCharts();
+                },
+                error: function () {
+                    console.log("Error fetching data.");
+                }
+            });
+        }
+
+        function toggleDarkMode() {
+            $("body").toggleClass("dark-mode");
+        }
+
+        updateData();
+        setInterval(updateData, 5000);
+
+        function showHistoricalData() {
+            window.location.href = "/historical";
+        }
+
+        function showLatestData() {
+            window.location.href = "/latest";
+        }
+    </script>
+    
+</body>
+
+</html>

@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Monitoring Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.3/Chart.min.css">
+    <style>
+        .chart-container {
+            position: relative;
+            width: 300px;
+            height: 300px;
+            display: inline-block;
+            margin: 20px;
+        }
+        .chart-info {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            font-size: 14px;
+            color: #555;
+        }
+        #loading {
+            display: none;
+            width: 100%;
+            text-align: center;
+        }
+        .chart-timer {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            font-size: 14px;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <h1>System Usages: Latest State</h1>
+    <div>
+        <label for="host-select">Select Host:</label>
+        <select id="host-select">
+            <option value="">Select a host...</option>
+        </select>
+        <button onclick="fetchData(document.getElementById('host-select').value)">Fetch Data</button>
+        <div id="loading">Loading...</div>
+    </div>
+    <div class="chart-container">
+        <h2>CPU Usage</h2>
+        <canvas id="cpu-chart"></canvas>
+        <div id="chart-info" class="chart-info"></div>
+        <div id="chart-timer" class="chart-timer"></div>
+    </div>
+    <div class="chart-container">
+        <h2>Memory Usage</h2>
+        <canvas id="mem-chart"></canvas>
+    </div>
+    <div class="chart-container">
+        <h2>Disk Usage</h2>
+        <canvas id="disk-chart"></canvas>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.3/Chart.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            fetchHosts(); // Fetch hosts when the page loads
+            setInterval(fetchDataAutomatically, 10000); // Fetch data every 10 seconds
+        });
+
+        function fetchHosts() {
+            fetch('/hosts')
+                .then(response => response.json())
+                .then(data => {
+                    const hostSelect = document.getElementById('host-select');
+                    Object.entries(data).forEach(([key, value]) => {
+                        const option = document.createElement('option');
+                        option.value = key;
+                        option.text = value;
+                        hostSelect.appendChild(option);
+                    });
+                })
+                .catch(error => console.error('Error fetching hosts:', error));
+        }
+
+        function fetchData(hostId) {
+            if (!hostId) {
+                console.error('No host selected');
+                return;
+            }
+            document.getElementById('loading').style.display = 'block'; // Show loading indicator
+
+            fetch(`/host/${hostId}`)
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('loading').style.display = 'none'; // Hide loading indicator
+                    updateChart('cpu-chart', data.cpu_usage, 'CPU Usage: ', '#5cb85c');
+                    updateChart('mem-chart', data.mem_usage, 'Memory Usage: ', '#f0ad4e');
+                    updateChart('disk-chart', data.disk_usage, 'Disk Usage: ', '#337ab7');
+                })
+                .catch(error => {
+                    console.error('Error fetching data:', error);
+                    document.getElementById('loading').style.display = 'none'; // Hide loading indicator on error
+                });
+        }
+
+        function fetchDataAutomatically() {
+            const selectedHost = document.getElementById('host-select').value;
+            if (selectedHost) {
+                fetchData(selectedHost);
+            }
+        }
+
+        function updateChart(chartId, data, label, backgroundColor) {
+            var ctx = document.getElementById(chartId).getContext('2d');
+            var chart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    datasets: [{
+                        data: [data, 100 - data],
+                        backgroundColor: [backgroundColor, '#eaeaea'],
+                        borderWidth: 0,
+                    }],
+                    labels: [label, '']
+                },
+                options: {
+                    responsive: true,
+                    cutoutPercentage: 80,
+                    legend: {
+                        display: false
+                    },
+                    tooltips: {
+                        enabled: true, // Enable tooltips
+                        callbacks: {
+                            label: function(tooltipItem, chartData) {
+                                var currentValue = chartData.datasets[0].data[0]; // Get the value of the colored portion
+                                return label + currentValue + '%';
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Add timer
+            var timer = document.getElementById('chart-timer');
+            timer.textContent = 'Next Update: 10s';
+
+            // Update timer every second
+            var timeLeft = 10;
+            var timerInterval = setInterval(function() {
+                timer.textContent = 'Next Update: ' + timeLeft + 's';
+                timeLeft--;
+                if (timeLeft < 0) {
+                    clearInterval(timerInterval);
+                }
+            }, 1000);
+        }
+    </script>
+</body>
+</html>

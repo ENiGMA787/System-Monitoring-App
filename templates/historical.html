@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Usage Chart</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .chart-container {
+            height: calc(33.33vh - 100px);
+            /* 33.33% of viewport height minus 100px for header and form */
+            margin-bottom: 20px;
+        }
+    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/historical.css') }}">
+</head>
+
+<body>
+    <h1>System Usages: Historical Trend</h1>
+    <form id="filterForm">
+        <label for="start_date">Start Date:</label>
+        <input type="date" id="start_date" name="start_date" required>
+        <label for="end_date">End Date:</label>
+        <input type="date" id="end_date" name="end_date" required>
+        <label for="host">Host:</label>
+        <select id="host" name="host">
+            <!-- Populate this dropdown dynamically with host names -->
+        </select>
+        <button type="submit">Fetch Data</button>
+    </form>
+
+    <div class="chart-container">
+        <h2>CPU Usage</h2>
+        <canvas id="cpuChart" width="800" height="400"></canvas>
+    </div>
+    <div class="chart-container">
+        <h2 style="padding-top:46px;">Memory Usage</h2>
+        <canvas id="memoryChart" width="800" height="400"></canvas>
+    </div>
+    <div class="chart-container">
+        <h2 style="padding-top:86px;">Disk Usage</h2>
+        <canvas id="diskChart" width="800" height="400"></canvas>
+    </div>
+
+    <script>
+        document.getElementById("filterForm").addEventListener("submit", function (event) {
+            event.preventDefault();
+            var startDate = document.getElementById("start_date").value;
+            var endDate = document.getElementById("end_date").value;
+
+            if (startDate > endDate) {
+                alert("Start date must not be later than end date.");
+                return; // Stop the form submission
+            }
+
+            updateCharts();
+        });
+
+        document.addEventListener("DOMContentLoaded", function () {
+            setMinMaxDates();
+
+            // Event listener for start date change
+            document.getElementById("start_date").addEventListener("change", setMinMaxDates);
+
+            // Event listener for end date change
+            document.getElementById("end_date").addEventListener("change", setMinMaxDates);
+        });
+
+        function setMinMaxDates() {
+            var startDateInput = document.getElementById("start_date");
+            var endDateInput = document.getElementById("end_date");
+
+            // Set min and max dates for start date
+            endDateInput.setAttribute('min', startDateInput.value);
+            endDateInput.setAttribute('max', endDateInput.max); // Reset max date
+
+            // Set min and max dates for end date
+            startDateInput.setAttribute('min', startDateInput.min); // Reset min date
+            startDateInput.setAttribute('max', endDateInput.value);
+        }
+
+        function updateCharts() {
+            var start_date = document.getElementById("start_date").value;
+            var end_date = document.getElementById("end_date").value;
+            var host = document.getElementById("host").options[document.getElementById("host").selectedIndex].text; // Get selected host
+
+            fetch('/historicaldata', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    'start_date': start_date,
+                    'end_date': end_date,
+                    'host': host // Include selected host in the request
+                }),
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.labels.length === 0 || data.cpu_usage.length === 0 || data.memory_usage.length === 0 || data.disk_usage_datasets.length === 0) {
+                        // No data available, display message
+                        displayNoDataMessage();
+                    } else {
+                        // Data available, update charts
+                        removeNoDataMessage();
+                        updateChart('cpuChart', data.labels, [{
+                            label: 'CPU Usage',
+                            data: data.cpu_usage,
+                            borderColor: 'rgb(255, 99, 132)',
+                            fill: false
+                        }]);
+                        updateChart('memoryChart', data.labels, [{
+                            label: 'Memory Usage',
+                            data: data.memory_usage,
+                            borderColor: 'rgb(54, 162, 235)',
+                            fill: false
+                        }]);
+                        updateChart('diskChart', data.labels, data.disk_usage_datasets);
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        function displayNoDataMessage() {
+            var chartContainers = document.querySelectorAll(".chart-container");
+            chartContainers.forEach(function (container) {
+                var canvas = container.querySelector("canvas");
+                var ctx = canvas.getContext("2d");
+                var chartTitle = container.querySelector("h2").innerText;
+                var chartTitleHeight = -80; // Adjust this value as needed
+                var chartTitleOffset = -50; // Adjust this value as needed
+                var chartWidth = canvas.width;
+                var chartHeight = canvas.height;
+
+                ctx.clearRect(0, 0, chartWidth, chartHeight); // Clear canvas
+                ctx.save();
+                ctx.textAlign = 'center';
+                ctx.font = '16px Arial';
+                ctx.fillText('No data available for the selected period', chartWidth / 2, (chartHeight / 2) + chartTitleHeight + chartTitleOffset);
+                ctx.restore();
+            });
+        }
+
+
+        function removeNoDataMessage() {
+            var chartContainers = document.querySelectorAll(".chart-container");
+            chartContainers.forEach(function (container) {
+                var ctx = container.querySelector("canvas").getContext("2d");
+                ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height); // Clear canvas
+            });
+        }
+
+        // *********funtion to fetch hosts from the database**************
+        // function populateHostDropdown() {
+        //     fetch('/hosts') // Assuming this endpoint returns a list of hosts
+        //         .then(response => response.json())
+        //         .then(hosts => {
+        //             var hostDropdown = document.getElementById("host");
+        //             hosts.forEach(host => {
+        //                 var option = document.createElement("option");
+        //                 option.value = host;
+        //                 option.text = host;
+        //                 hostDropdown.appendChild(option);
+        //             });
+        //             updateCharts(); // Once hosts are loaded, update the charts
+        //         })
+        //         .catch(error => console.error('Error:', error));
+        // }
+        function populateHostDropdown() {
+            fetch('/hosts')  // Assuming this fetches from the Flask `/hosts` endpoint.
+                .then(response => response.json())
+                .then(hosts => {
+                    var hostDropdown = document.getElementById("host");  // Correct the ID to match your HTML.
+                    // Clear existing options
+                    hostDropdown.innerHTML = '<option value="">Select a host...</option>';
+
+                    Object.entries(hosts).forEach(([hostId, hostname]) => {
+                        var option = document.createElement("option");
+                        option.value = hostId;  // Use host ID as the value
+                        option.text = hostname; // Use hostname as the text
+                        hostDropdown.appendChild(option);
+                    });
+                    updateCharts(); // Once hosts are loaded, update the charts
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        document.addEventListener("DOMContentLoaded", populateHostDropdown); // Ensure it's called when the DOM is ready
+
+        function updateChart(canvasId, labels, datasets) {
+            var container = document.getElementById(canvasId).parentElement;
+            var canvas = container.querySelector("canvas");
+
+            if (!canvas) {
+                console.error("Canvas element not found in chart container.");
+                return;
+            }
+
+            var ctx = canvas.getContext('2d');
+            if (window[canvasId + 'Chart']) {
+                window[canvasId + 'Chart'].destroy(); // Destroy previous chart instance if exists
+            }
+            window[canvasId + 'Chart'] = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+        }
+
+        window.addEventListener('resize', setChartContainerHeight);
+
+        function setChartContainerHeight() {
+            var viewportHeight = window.innerHeight;
+            var formElement = document.getElementById("filterForm");
+            var formHeight = formElement ? formElement.offsetHeight : 0;
+            var chartContainers = document.querySelectorAll(".chart-container");
+            var chartContainerHeight = (viewportHeight - formHeight - 40) / chartContainers.length; // Subtracting form height and additional margin
+            chartContainers.forEach(function (container) {
+                container.style.height = chartContainerHeight + "px";
+            });
+        }
+
+        setChartContainerHeight(); // Set initial chart container height
+        document.addEventListener("DOMContentLoaded", populateHostDropdown); // Populate host dropdown on page load
+    </script>
+</body>
+
+</html>
