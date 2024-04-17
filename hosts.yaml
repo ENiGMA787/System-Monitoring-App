@@ -1,24 +1,24 @@
 hosts:
   linux1:
-    type: linux
-    hostname: 192.168.1.3
-    auth_method: password
-    username: kali
-    password: kali
+    type: OS (Linux or Windows)
+    hostname: IP
+    auth_method: password or private_key
+    username: username
+    password: password
   linux2:
-    type: linux
-    hostname: 192.168.1.10
-    auth_method: password
-    username: kali
-    password: kali
+    type: OS (Linux or Windows)
+    hostname: IP
+    auth_method: password or private_key
+    username: username
+    password: password
   # windows1:
-  #   type: windows
-  #   hostname: 192.168.1.102
-  #   username: administrator
-  #   password: admin123
+  #   type: windows or Linux
+  #   hostname: IP
+  #   username: username
+  #   password: password
   # linux1:
   #   type: linux
-  #   hostname: 192.168.1.103
+  #   hostname: IP
   #   auth_method: private_key
-  #   username: root
+  #   username: username
   #   key_path: /path/to/private/key
