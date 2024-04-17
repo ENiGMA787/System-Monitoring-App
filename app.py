@@ -79,7 +79,7 @@ def logout():
 def data():
     cpu_usage = psutil.cpu_percent()
     mem_usage = psutil.virtual_memory().percent
-    disk_usage = psutil.disk_usage('C:').percent
+    disk_usage = psutil.disk_usage('/').percent
     msg = "OK"
     if cpu_usage > 80 or mem_usage > 80 or disk_usage > 80:
         msg = "Warning"
@@ -91,7 +91,7 @@ def index():
         return redirect("/login")
     cpu_usage = psutil.cpu_percent()
     mem_usage = psutil.virtual_memory().percent
-    disk_usage = psutil.disk_usage('C:').percent
+    disk_usage = psutil.disk_usage('/').percent
     return render_template("index.html", cpu_usage=cpu_usage, mem_usage=mem_usage, disk_usage=disk_usage)
 
 # Load host configurations from YAML file
