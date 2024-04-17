@@ -1,16 +1,4 @@
 hosts:
-  linux1:
-    type: linux
-    hostname: 192.168.1.3
-    auth_method: password
-    username: kali
-    password: kali
-  linux2:
-    type: linux
-    hostname: 192.168.1.10
-    auth_method: password
-    username: kali
-    password: kali
   # windows1:
   #   type: windows
   #   hostname: 192.168.1.102
