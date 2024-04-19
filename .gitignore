@@ -1,0 +1,6 @@
+
+*.yaml
+*.yaml
+*.yaml
+/flask_session
+/flask_session
