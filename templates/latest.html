@@ -1,158 +1,410 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>System Monitoring Dashboard</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.3/Chart.min.css">
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.3/Chart.min.css"
+    />
     <style>
-        .chart-container {
-            position: relative;
-            width: 300px;
-            height: 300px;
-            display: inline-block;
-            margin: 20px;
-        }
-        .chart-info {
-            position: absolute;
-            bottom: 10px;
-            left: 10px;
-            font-size: 14px;
-            color: #555;
-        }
-        #loading {
-            display: none;
-            width: 100%;
-            text-align: center;
-        }
-        .chart-timer {
-            position: absolute;
-            bottom: 10px;
-            right: 10px;
-            font-size: 14px;
-            color: #555;
-        }
+      .chart-container {
+        position: relative;
+        width: 300px;
+        height: 300px;
+        display: inline-block;
+        margin: 20px;
+      }
+
+      .chart-info {
+        position: absolute;
+        bottom: 10px;
+        left: 10px;
+        font-size: 14px;
+        color: #555;
+      }
+
+      #loading {
+        display: none;
+        width: 100%;
+        text-align: center;
+      }
+
+      .chart-timer {
+        position: absolute;
+        bottom: 10px;
+        right: 10px;
+        font-size: 14px;
+        color: #555;
+      }
     </style>
-</head>
-<body>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/latest.css') }}"
+    />
+  </head>
+
+  <body>
     <h1>System Usages: Latest State</h1>
     <div>
-        <label for="host-select">Select Host:</label>
-        <select id="host-select">
-            <option value="">Select a host...</option>
-        </select>
-        <button onclick="fetchData(document.getElementById('host-select').value)">Fetch Data</button>
-        <div id="loading">Loading...</div>
+      <label for="host-select">Select Host:</label>
+      <select id="host-select" onchange="clearAndFetchData()">
+        <option value="">Select a host...</option>
+      </select>
+      <button onclick="fetchData(document.getElementById('host-select').value)">
+        Fetch Data
+      </button>
+      <div id="loading">Loading...</div>
+      <button onclick="exportToPDF()">Export to PDF</button>
+      <button onclick="exportToPPT()">Export to PPT</button>
+    </div>
+
+    <form action="/generate" method="post">
+      <button type="submit">Generate and Download</button>
+    </form>
+
+    <div class="chart-container">
+      <h2>CPU Usage</h2>
+      <canvas id="cpu-chart"></canvas>
+      <div id="chart-info" class="chart-info"></div>
+      <div id="cpu-chart-timer" class="chart-timer"></div>
     </div>
     <div class="chart-container">
-        <h2>CPU Usage</h2>
-        <canvas id="cpu-chart"></canvas>
-        <div id="chart-info" class="chart-info"></div>
-        <div id="chart-timer" class="chart-timer"></div>
+      <h2>Memory Usage</h2>
+      <canvas id="mem-chart"></canvas>
+      <div id="mem-chart-timer" class="chart-timer"></div>
     </div>
     <div class="chart-container">
-        <h2>Memory Usage</h2>
-        <canvas id="mem-chart"></canvas>
-    </div>
-    <div class="chart-container">
-        <h2>Disk Usage</h2>
-        <canvas id="disk-chart"></canvas>
+      <h2>Disk Usage</h2>
+      <canvas id="disk-chart"></canvas>
+      <div id="disk-chart-timer" class="chart-timer"></div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.3/Chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pptxgenjs/3.3.4/pptxgen.bundle.min.js"></script>
+
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            fetchHosts(); // Fetch hosts when the page loads
-            setInterval(fetchDataAutomatically, 10000); // Fetch data every 10 seconds
-        });
+      // Global variables to hold chart instances and timers
+      let cpuChart, memChart, diskChart;
+      let cpuData = [],
+        memData = [],
+        diskData = [];
+      let cpuTimer, memTimer, diskTimer;
 
-        function fetchHosts() {
-            fetch('/hosts')
-                .then(response => response.json())
-                .then(data => {
-                    const hostSelect = document.getElementById('host-select');
-                    Object.entries(data).forEach(([key, value]) => {
-                        const option = document.createElement('option');
-                        option.value = key;
-                        option.text = value;
-                        hostSelect.appendChild(option);
-                    });
-                })
-                .catch(error => console.error('Error fetching hosts:', error));
-        }
+      document.addEventListener("DOMContentLoaded", function () {
+        fetchHosts(); // Fetch hosts when the page loads
+        fetchDataAutomatically(); // Fetch data automatically on page load
+        setInterval(fetchDataAutomatically, 5000); // Fetch data every 5 seconds
+      });
 
-        function fetchData(hostId) {
-            if (!hostId) {
-                console.error('No host selected');
-                return;
-            }
-            document.getElementById('loading').style.display = 'block'; // Show loading indicator
-
-            fetch(`/host/${hostId}`)
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById('loading').style.display = 'none'; // Hide loading indicator
-                    updateChart('cpu-chart', data.cpu_usage, 'CPU Usage: ', '#5cb85c');
-                    updateChart('mem-chart', data.mem_usage, 'Memory Usage: ', '#f0ad4e');
-                    updateChart('disk-chart', data.disk_usage, 'Disk Usage: ', '#337ab7');
-                })
-                .catch(error => {
-                    console.error('Error fetching data:', error);
-                    document.getElementById('loading').style.display = 'none'; // Hide loading indicator on error
-                });
-        }
-
-        function fetchDataAutomatically() {
-            const selectedHost = document.getElementById('host-select').value;
-            if (selectedHost) {
-                fetchData(selectedHost);
-            }
-        }
-
-        function updateChart(chartId, data, label, backgroundColor) {
-            var ctx = document.getElementById(chartId).getContext('2d');
-            var chart = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    datasets: [{
-                        data: [data, 100 - data],
-                        backgroundColor: [backgroundColor, '#eaeaea'],
-                        borderWidth: 0,
-                    }],
-                    labels: [label, '']
-                },
-                options: {
-                    responsive: true,
-                    cutoutPercentage: 80,
-                    legend: {
-                        display: false
-                    },
-                    tooltips: {
-                        enabled: true, // Enable tooltips
-                        callbacks: {
-                            label: function(tooltipItem, chartData) {
-                                var currentValue = chartData.datasets[0].data[0]; // Get the value of the colored portion
-                                return label + currentValue + '%';
-                            }
-                        }
-                    }
-                }
+      function fetchHosts() {
+        fetch("/hosts")
+          .then((response) => response.json())
+          .then((data) => {
+            const hostSelect = document.getElementById("host-select");
+            Object.entries(data).forEach(([key, value]) => {
+              const option = document.createElement("option");
+              option.value = key;
+              option.text = value;
+              hostSelect.appendChild(option);
             });
+          })
+          .catch((error) => console.error("Error fetching hosts:", error));
+      }
 
-            // Add timer
-            var timer = document.getElementById('chart-timer');
-            timer.textContent = 'Next Update: 10s';
+      function clearAndFetchData() {
+        clearData();
+        fetchData(document.getElementById("host-select").value);
+      }
 
-            // Update timer every second
-            var timeLeft = 10;
-            var timerInterval = setInterval(function() {
-                timer.textContent = 'Next Update: ' + timeLeft + 's';
-                timeLeft--;
-                if (timeLeft < 0) {
-                    clearInterval(timerInterval);
-                }
-            }, 1000);
+      function clearData() {
+        // Clear existing data arrays
+        cpuData = [];
+        memData = [];
+        diskData = [];
+
+        // Clear existing chart instances
+        if (cpuChart) {
+          cpuChart.destroy();
         }
+        if (memChart) {
+          memChart.destroy();
+        }
+        if (diskChart) {
+          diskChart.destroy();
+        }
+
+        // Reinitialize chart instances
+        initCharts();
+
+        // Clear timers
+        clearInterval(cpuTimer);
+        clearInterval(memTimer);
+        clearInterval(diskTimer);
+      }
+
+      function initCharts() {
+        // Initialize chart instances
+        cpuChart = new Chart(
+          document.getElementById("cpu-chart").getContext("2d"),
+          {
+            type: "line",
+            data: {
+              labels: [],
+              datasets: [
+                {
+                  label: "CPU Usage: ",
+                  data: [],
+                  backgroundColor: "rgba(75, 192, 192, 0.2)",
+                  borderColor: "#5cb85c",
+                  borderWidth: 1,
+                },
+              ],
+            },
+            options: {
+              scales: {
+                y: {
+                  beginAtZero: true,
+                },
+              },
+            },
+          }
+        );
+
+        memChart = new Chart(
+          document.getElementById("mem-chart").getContext("2d"),
+          {
+            type: "line",
+            data: {
+              labels: [],
+              datasets: [
+                {
+                  label: "Memory Usage: ",
+                  data: [],
+                  backgroundColor: "rgba(75, 192, 192, 0.2)",
+                  borderColor: "#f0ad4e",
+                  borderWidth: 1,
+                },
+              ],
+            },
+            options: {
+              scales: {
+                y: {
+                  beginAtZero: true,
+                },
+              },
+            },
+          }
+        );
+
+        diskChart = new Chart(
+          document.getElementById("disk-chart").getContext("2d"),
+          {
+            type: "line",
+            data: {
+              labels: [],
+              datasets: [
+                {
+                  label: "Disk Usage: ",
+                  data: [],
+                  backgroundColor: "rgba(75, 192, 192, 0.2)",
+                  borderColor: "#337ab7",
+                  borderWidth: 1,
+                },
+              ],
+            },
+            options: {
+              scales: {
+                y: {
+                  beginAtZero: true,
+                },
+              },
+            },
+          }
+        );
+
+        // Start timers
+        cpuTimer = document.getElementById("cpu-chart-timer");
+        memTimer = document.getElementById("mem-chart-timer");
+        diskTimer = document.getElementById("disk-chart-timer");
+
+        updateTimer(cpuTimer);
+        updateTimer(memTimer);
+        updateTimer(diskTimer);
+      }
+
+      function fetchData(hostId) {
+        if (!hostId) {
+          console.error("No host selected");
+          return;
+        }
+        // Show loading indicator
+        document.getElementById("loading").style.display = "block";
+
+        fetch(`/host/${hostId}`)
+          .then((response) => response.json())
+          .then((data) => {
+            // Hide loading indicator
+            document.getElementById("loading").style.display = "none";
+            updateChartData(data.cpu_usage, data.mem_usage, data.disk_usage);
+          })
+          .catch((error) => {
+            console.error("Error fetching data:", error);
+            // Hide loading indicator on error
+            document.getElementById("loading").style.display = "none";
+          });
+      }
+
+      function fetchDataAutomatically() {
+        const selectedHost = document.getElementById("host-select").value;
+        if (selectedHost) {
+          fetchData(selectedHost);
+        }
+      }
+
+      function updateChartData(cpu, mem, disk) {
+        // Update data arrays
+        cpuData.push(cpu);
+        memData.push(mem);
+        diskData.push(disk);
+
+        // Remove old data points if more than 60
+        if (cpuData.length > 60) {
+          cpuData.shift();
+          memData.shift();
+          diskData.shift();
+        }
+
+        // Update charts
+        updateChart(cpuChart, cpuData, "CPU Usage: ", "#5cb85c", cpuTimer);
+        updateChart(memChart, memData, "Memory Usage: ", "#f0ad4e", memTimer);
+        updateChart(diskChart, diskData, "Disk Usage: ", "#337ab7", diskTimer);
+      }
+
+      function updateChart(chart, newData, label, backgroundColor, timer) {
+        const labels = Array.from({ length: newData.length }, (_, i) =>
+          formatTime(newData.length - i - 1)
+        ).reverse();
+        chart.data.labels = labels;
+        chart.data.datasets.forEach((dataset) => {
+          dataset.data = newData;
+          dataset.label = label;
+          dataset.backgroundColor = backgroundColor;
+        });
+        chart.update();
+
+        // // Show loading for 5 seconds
+        // document.getElementById("loading").style.display = "block";
+        // setTimeout(() => {
+        //   document.getElementById("loading").style.display = "none";
+        // }, 3000);
+
+        // Reset timer
+        clearInterval(timer);
+        updateTimer(timer);
+      }
+
+      function formatTime(index) {
+        const seconds = index * 5;
+        if (seconds < 60) {
+          return seconds + "s";
+        } else if (seconds < 3600) {
+          const minutes = Math.floor(seconds / 60);
+          return minutes + "m " + (seconds % 60) + "s";
+        } else {
+          const hours = Math.floor(seconds / 3600);
+          const remainingMinutes = Math.floor((seconds % 3600) / 60);
+          return hours + "h " + remainingMinutes + "m";
+        }
+      }
+
+      function updateTimer(timer) {
+        var timeLeft = 5;
+        timer.textContent = "Next Update: " + timeLeft + "s";
+        var timerInterval = setInterval(function () {
+          timer.textContent = "Next Update: " + timeLeft + "s";
+          timeLeft--;
+          if (timeLeft < 0) {
+            clearInterval(timerInterval);
+          }
+        }, 1000);
+      }
+
+      function exportToPDF() {
+        const selectedHost = document.getElementById("host-select").value;
+        if (selectedHost) {
+          fetchData(selectedHost)
+            .then((data) => {
+              // Export data to PDF
+              const pdf = new jsPDF();
+              pdf.text(20, 20, "CPU Usage");
+              pdf.text(20, 30, JSON.stringify(data.cpu_usage));
+              pdf.text(20, 40, "Memory Usage");
+              pdf.text(20, 50, JSON.stringify(data.mem_usage));
+              pdf.text(20, 60, "Disk Usage");
+              pdf.text(20, 70, JSON.stringify(data.disk_usage));
+              // Convert the PDF to a blob
+              const pdfBlob = pdf.output("blob");
+              // Create a link element
+              const link = document.createElement("a");
+              link.href = URL.createObjectURL(pdfBlob);
+              link.download = "system_usage.pdf";
+              // Programmatically click the link to trigger the download
+              link.click();
+              // Clean up
+              URL.revokeObjectURL(link.href);
+            })
+            .catch((error) => {
+              console.error("Error exporting to PDF:", error);
+            });
+        } else {
+          console.error("No host selected");
+        }
+      }
+
+      function exportToPPT() {
+        const selectedHost = document.getElementById("host-select").value;
+        if (selectedHost) {
+          fetchData(selectedHost)
+            .then((data) => {
+              // Export data to PPT
+              const pptx = new PptxGenJS();
+              const slide = pptx.addSlide();
+              slide.addText("CPU Usage", {
+                x: 1,
+                y: 1,
+                fontSize: 18,
+                color: "363636",
+              });
+              slide.addText(JSON.stringify(data.cpu_usage), { x: 1, y: 2 });
+              slide.addText("Memory Usage", {
+                x: 1,
+                y: 3,
+                fontSize: 18,
+                color: "363636",
+              });
+              slide.addText(JSON.stringify(data.mem_usage), { x: 1, y: 4 });
+              slide.addText("Disk Usage", {
+                x: 1,
+                y: 5,
+                fontSize: 18,
+                color: "363636",
+              });
+              slide.addText(JSON.stringify(data.disk_usage), { x: 1, y: 6 });
+              pptx.save("system_usage.pptx");
+            })
+            .catch((error) => {
+              console.error("Error exporting to PPT:", error);
+            });
+        } else {
+          console.error("No host selected");
+        }
+      }
+
+      // Initialize charts and timers
+      initCharts();
     </script>
-</body>
+  </body>
 </html>

@@ -10,6 +10,13 @@ import calendar
 from random import randint
 import paramiko
 import winrm
+from flask import Flask, render_template, request, send_file
+from selenium import webdriver
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from pptx import Presentation
+from pptx.util import Inches
+import os
 
 app = Flask(__name__)
 
@@ -268,6 +275,51 @@ def historical():
     if not session.get("logged_in"):
         return redirect("/login")
     return render_template('historical.html')
+
+# Function to take screenshot using Selenium
+
+
+# Function to take screenshot using Selenium
+def take_screenshot(filename):
+    driver = webdriver.Chrome()  # Or use any other webdriver like Firefox or Safari
+    driver.get(request.url_root)  # Capture the current page
+    driver.save_screenshot(filename)
+    driver.quit()
+
+# Function to generate PDF
+def generate_pdf(filename):
+    c = canvas.Canvas(filename, pagesize=letter)
+    c.drawImage('screenshot.png', 0, 0, width=letter[0], height=letter[1])
+    c.save()
+
+# Function to generate PPT
+def generate_ppt(filename):
+    prs = Presentation()
+    slide = prs.slides.add_slide(prs.slide_layouts[5])  # Use a blank layout
+    left = top = Inches(1)
+    pic = slide.shapes.add_picture('screenshot.png', left, top, width=Inches(8), height=Inches(6))
+    prs.save(filename)
+
+@app.route('/generate', methods=['POST'])
+def generate():
+    screenshot_filename = 'screenshot.png'
+    pdf_filename = 'page_snapshot.pdf'
+    ppt_filename = 'page_snapshot.pptx'
+    
+    # Take screenshot
+    take_screenshot(screenshot_filename)
+
+    # Generate PDF
+    generate_pdf(pdf_filename)
+
+    # Generate PPT
+    generate_ppt(ppt_filename)
+
+    # Delete screenshot file
+    os.remove(screenshot_filename)
+
+    # Return PDF and PPT files for download
+    return send_file(pdf_filename, as_attachment=True), send_file(ppt_filename, as_attachment=True)
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0')

@@ -80,3 +80,50 @@ button:hover {
     color: #555;
     margin-bottom: 10px;
 }
+
+/* CSS for the export to PDF button */
+.export-btn {
+    display: inline-block;
+    padding: 10px 20px;
+    background-color: #007bff; /* Blue color */
+    color: #fff; /* White text */
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    text-align: center;
+    font-size: 16px;
+}
+
+.export-btn:hover {
+    background-color: #0056b3; /* Darker blue color on hover */
+}
+
+.chart-container {
+    position: relative;
+    width: 1000px; /* Increase the width */
+    height: 600px; /* Increase the height */
+    display: inline-block;
+    margin: 20px;
+}
+
+#loading {
+    position: fixed;
+    top: 20px; /* Adjust the distance from the top as needed */
+    right: 20px; /* Adjust the distance from the right as needed */
+    background-color: rgba(255, 255, 255, 0.8); /* Semi-transparent white background */
+    padding: 5px; /* Add padding for better visibility */
+    border-radius: 5px; /* Rounded corners */
+    font-size: 14px; /* Adjust font size as needed */
+    color: #333; /* Text color */
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); /* Drop shadow */
+    z-index: 1000; /* Ensure it's above other elements */
+    width: auto; /* Adjust the width automatically based on content */
+    max-width: 80%; /* Maximum width of 80% of the viewport */
+    min-width: 100px; /* Minimum width of 100px */
+    height: auto; /* Adjust the height automatically based on content */
+    max-height: 200px; /* Maximum height of 200px */
+    overflow: auto; /* Enable scrolling if content exceeds the maximum height */
+  }
+  
+  
+  
