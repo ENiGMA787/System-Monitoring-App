@@ -1,13 +1,13 @@
 hosts:
   linux1:
     type: linux #kali1
-    hostname: 192.168.1.7
+    hostname: hostname
     auth_method: password
     username: kali 
     password: kali
   linux2:
     type: linux #kali2
-    hostname: 192.168.1.11
+    hostname: hostname
     auth_method: password
     username: kali
     password: kali
